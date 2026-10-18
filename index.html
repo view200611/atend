@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Attendance Tracker</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;600;800&display=swap">
+<style>
+:root{--bg:#f3f6fb;--card:#fff;--ink:#14213d;--mute:#5d6b85;--line:#dbe3f0;--acc:#2447d8;--ok:#1b8a5a;--warn:#c98a00;--bad:#d03a3a;--okb:#e0f4ea;--warnb:#fff3d1;--badb:#fde4e4;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1524;--card:#18203a;--ink:#e8edf8;--mute:#9aa7c4;--line:#2b3556;--acc:#7b97ff;--ok:#4fd08f;--warn:#f0b94a;--bad:#ff7a7a;--okb:#143a2b;--warnb:#3d3112;--badb:#4a1d22}}
+:root[data-theme="dark"]{--bg:#0f1524;--card:#18203a;--ink:#e8edf8;--mute:#9aa7c4;--line:#2b3556;--acc:#7b97ff;--ok:#4fd08f;--warn:#f0b94a;--bad:#ff7a7a;--okb:#143a2b;--warnb:#3d3112;--badb:#4a1d22}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Schibsted Grotesk",system-ui,sans-serif;line-height:1.45}
+main{max-width:760px;margin:0 auto;padding:16px}
+h1{font-size:1.5rem;margin:8px 0 14px;font-weight:800}
+h2{font-size:1.05rem;margin:0 0 10px}
+nav{display:flex;gap:6px;margin-bottom:14px;overflow-x:auto}
+nav button{flex:1;padding:10px 8px;border:1px solid var(--line);background:var(--card);color:var(--mute);border-radius:10px;font:inherit;font-weight:600;cursor:pointer;white-space:nowrap}
+nav button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+.big{font-size:3.4rem;font-weight:800;line-height:1}
+.mute{color:var(--mute);font-size:.9rem}
+.bar{position:relative;height:12px;background:var(--line);border-radius:6px;margin:10px 0 4px}
+.bar i{display:block;height:100%;border-radius:6px}
+.bar b{position:absolute;top:-4px;width:2px;height:20px;background:var(--ink)}
+.ok i{background:var(--ok)}.warn i{background:var(--warn)}.bad i{background:var(--bad)}
+.tag{display:inline-block;padding:2px 9px;border-radius:99px;font-size:.8rem;font-weight:600}
+.tag.ok{background:var(--okb);color:var(--ok)}.tag.warn{background:var(--warnb);color:var(--warn)}.tag.bad{background:var(--badb);color:var(--bad)}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.sp{justify-content:space-between}
+input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px}
+input[type=number]{width:72px}
+input[type=text]{flex:1;min-width:120px}
+.btn{font:inherit;font-weight:600;padding:9px 14px;border-radius:9px;border:0;background:var(--acc);color:#fff;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--bad);border:1px solid var(--line);padding:6px 10px}
+.chip{display:flex;align-items:center;gap:4px;padding:6px 10px;border:1px solid var(--line);border-radius:99px;cursor:pointer}
+.scroll{overflow-x:auto}
+textarea{font:inherit;font-size:.8rem;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px}
+table{width:100%;border-collapse:collapse;font-size:.92rem}
+th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
+.empty{text-align:center;color:var(--mute);padding:24px 8px}
+footer{max-width:760px;margin:0 auto;padding:8px 16px 28px;text-align:center;color:var(--mute);font-size:.85rem}
+</style>
+</head>
+<body>
+<main>
+<h1 id="ttl">Attendance tracker</h1>
+<div class="row" style="margin-bottom:14px"><input type="text" id="uname" maxlength="40" placeholder="Your name" aria-label="Your name" onchange="S.name=this.value.trim();save();hello()"></div>
+<nav id="nav"></nav>
+<div id="view"></div>
+</main>
+<footer>© 2026 Attendance Tracker. Product by Nullx</footer>
+<script>
+const DAYS=['Mon','Tue','Wed','Thu','Fri','Sat'];
+let S={target:75,subjects:[],tt:{}};
+DAYS.forEach(d=>S.tt[d]=[]);
+let tab='dash';
+try{const x=JSON.parse(localStorage.getItem('att-v1')||'null');if(x&&x.subjects){S=x;DAYS.forEach(d=>{if(!S.tt[d])S.tt[d]=[]})}}catch(e){}
+function save(){try{localStorage.setItem('att-v1',JSON.stringify(S))}catch(e){}}
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pct=(a,t)=>t>0?a/t*100:0;
+const fmt=n=>(Math.round(n*10)/10).toFixed(1)+'%';
+const cls=p=>p>=S.target+5?'ok':p>=S.target?'warn':'bad';
+function advice(a,t){
+  const p=S.target/100;
+  if(t===0)return'No classes yet';
+  if(a/t>=p){const n=Math.floor(a/p-t);return n>0?`Can miss ${n} more class${n>1?'es':''}`:'No safe misses left'}
+  if(p>=1)return'Target unreachable';
+  const n=Math.ceil((p*t-a)/(1-p));return`Attend next ${n} class${n>1?'es':''} to recover`;
+}
+function sums(list){let a=0,t=0;list.forEach(s=>{a+=s.a;t+=s.t});return[a,t]}
+function nav(){
+  const T=[['dash','Dashboard'],['subj','Subjects'],['quick','Quick update'],['tt','Timetable'],['pred','Predict'],['plan','Plan ahead'],['data','Data']];
+  $('#nav').innerHTML=T.map(([k,l])=>`<button class="${tab===k?'on':''}" onclick="tab='${k}';render()">${l}</button>`).join('');
+}
+function hello(){$('#ttl').textContent=S.name?S.name+'’s attendance':'Attendance tracker';const u=$('#uname');if(u&&document.activeElement!==u)u.value=S.name||''}
+function render(){nav();hello();({dash,subj,quick,tt,pred,plan,data})[tab]();}
+function dash(){
+  if(!S.subjects.length){$('#view').innerHTML='<div class="card empty">Add your subjects and current attendance in the Subjects tab to begin.</div>';return}
+  const[a,t]=sums(S.subjects),p=pct(a,t);
+  let h=statusCard()+`<div class="card"><div class="row sp"><div><div class="big">${fmt(p)}</div><div class="mute">Overall: ${a} of ${t} classes (total attended ÷ total held)</div></div><span class="tag ${cls(p)}">${p>=S.target?'Safe':'Below target'}</span></div>
+  <div class="bar ${cls(p)}"><i style="width:${Math.min(p,100)}%"></i><b style="left:${S.target}%"></b></div>
+  <div class="mute">${advice(a,t)} · target ${S.target}% <input type="number" min="1" max="100" value="${S.target}" onchange="S.target=Math.min(100,Math.max(1,+this.value||75));save();render()" aria-label="Target percentage"></div></div>`;
+  S.subjects.forEach(s=>{const q=pct(s.a,s.t);
+    h+=`<div class="card"><div class="row sp"><strong>${esc(s.name)}</strong><span class="tag ${cls(q)}">${fmt(q)}</span></div>
+    <div class="bar ${cls(q)}"><i style="width:${Math.min(q,100)}%"></i><b style="left:${S.target}%"></b></div>
+    <div class="mute">${s.a}/${s.t} attended · ${advice(s.a,s.t)}</div></div>`});
+  $('#view').innerHTML=h;
+}
+function subj(){
+  let h=`<div class="card"><h2>Add subject</h2><div class="row"><input type="text" id="nm" placeholder="Subject name"><button class="btn" onclick="addSubj()">Add subject</button></div></div>`;
+  if(S.subjects.length){h+=`<div class="card"><h2>Current attendance</h2><p class="mute">Enter the totals from your college portal, then set the date they are counted up to. Values save when you leave the field.</p><label class="mute">Counted up to <input type="date" value="${S.upto||''}" max="${today()}" onchange="S.upto=this.value;S.at=Date.now();save();render()"></label>`;
+    S.subjects.forEach((s,i)=>{h+=`<div class="row sp" style="padding:8px 0;border-top:1px solid var(--line)"><strong style="flex:1;min-width:110px">${esc(s.name)}</strong>
+    <label class="mute">Attended <input type="number" min="0" value="${s.a}" onchange="upd(${i},'a',this.value)"></label>
+    <label class="mute">Held <input type="number" min="0" value="${s.t}" onchange="upd(${i},'t',this.value)"></label>
+    <button class="btn ghost" onclick="delSubj(${i})" aria-label="Delete ${esc(s.name)}">Delete</button></div>`});
+    h+='</div>'}
+  $('#view').innerHTML=h;
+}
+function addSubj(){const n=$('#nm').value.trim();if(!n)return;S.subjects.push({id:Date.now()+Math.random(),name:n,a:0,t:0});save();render()}
+function upd(i,k,v){S.at=Date.now();v=Math.max(0,Math.floor(+v||0));const s=S.subjects[i];s[k]=v;if(s.a>s.t){if(k==='a')s.t=s.a;else s.a=s.t}save();render()}
+function delSubj(i){const id=S.subjects[i].id;S.subjects.splice(i,1);DAYS.forEach(d=>S.tt[d]=S.tt[d].filter(x=>x!==id));save();render()}
+function tt(){
+  if(!S.subjects.length){$('#view').innerHTML='<div class="card empty">Add subjects first, then build your weekly timetable here.</div>';return}
+  const opts=sel=>`<option value="">Choose subject</option>`+S.subjects.map(s=>`<option value="${s.id}" ${s.id===sel?'selected':''}>${esc(s.name)}</option>`).join('');
+  let h='<p class="mute">Add one row per period for each day, in order.</p>';
+  DAYS.forEach(d=>{h+=`<div class="card"><div class="row sp"><h2 style="margin:0">${d}</h2><button class="btn" onclick="addP('${d}')">Add period</button></div>`;
+    if(!S.tt[d].length)h+='<div class="mute" style="padding-top:8px">No periods</div>';
+    S.tt[d].forEach((id,j)=>{h+=`<div class="row" style="margin-top:8px"><span class="mute" style="width:28px">P${j+1}</span><select onchange="setP('${d}',${j},this.value)" style="flex:1">${opts(id)}</select><button class="btn ghost" onclick="delP('${d}',${j})" aria-label="Remove period">Remove</button></div>`});
+    h+='</div>'});
+  $('#view').innerHTML=h;
+}
+function addP(d){S.tt[d].push(null);save();render()}
+function setP(d,j,v){S.tt[d][j]=v?+v:null;save()}
+function delP(d,j){S.tt[d].splice(j,1);save();render()}
+const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const today=()=>ymd(new Date());
+function modeBar(){return `<div class="row" style="margin-bottom:12px"><button class="btn" style="${P.mode==='days'?'':'opacity:.55'}" onclick="P.mode='days';pred()">Whole days</button><button class="btn" style="${P.mode==='per'?'':'opacity:.55'}" onclick="P.mode='per';pred()">Specific periods</button></div>`}
+function predPer(){
+  if(!S.subjects.length){$('#view').innerHTML='<div class="card empty">Add subjects and a timetable to predict future attendance.</div>';return}
+  const list=S.tt[P.pd]||[];
+  let h=modeBar()+`<div class="card"><h2>If I miss some periods</h2><div class="row"><label class="mute">Day <select onchange="P.pd=this.value;P.sel={};pred()">${DAYS.map(d=>`<option ${d===P.pd?'selected':''}>${d}</option>`).join('')}</select></label><label class="mute">How many such days <input type="number" min="1" max="60" value="${P.weeks}" onchange="P.weeks=Math.max(1,Math.floor(+this.value||1));pred()"></label></div><p class="mute" style="margin:10px 0 6px">Periods I will miss</p><div class="row">`;
+  if(!list.length)h+=`<span class="mute">No periods set for ${P.pd}. Add them in the Timetable tab.</span>`;
+  list.forEach((id,j)=>{const s=S.subjects.find(x=>x.id===id);h+=`<label class="chip"><input type="checkbox" ${P.sel[j]?'checked':''} onchange="P.sel[${j}]=this.checked;pred()">P${j+1} ${s?esc(s.name):'(no subject)'}</label>`});
+  h+='</div></div>';
+  const miss={};S.subjects.forEach(s=>miss[s.id]=0);
+  list.forEach((id,j)=>{if(P.sel[j]&&id in miss)miss[id]+=P.weeks});
+  const total=Object.values(miss).reduce((x,y)=>x+y,0);
+  const[a,t]=sums(S.subjects),np=pct(a,t+total);
+  h+=`<div class="card"><div class="row sp"><div><div class="big">${fmt(np)}</div><div class="mute">Overall after missing ${total} class${total===1?'':'es'} (now ${fmt(pct(a,t))})</div></div><span class="tag ${cls(np)}">${np>=S.target?'Still safe':'Below target'}</span></div><div class="bar ${cls(np)}"><i style="width:${Math.min(np,100)}%"></i><b style="left:${S.target}%"></b></div></div><div class="card scroll"><table><tr><th>Subject</th><th>Now</th><th>Missed</th><th>After</th></tr>`;
+  S.subjects.forEach(s=>{const n=pct(s.a,s.t+miss[s.id]);h+=`<tr><td>${esc(s.name)}</td><td>${fmt(pct(s.a,s.t))}</td><td>${miss[s.id]}</td><td><span class="tag ${cls(n)}">${fmt(n)}</span></td></tr>`});
+  h+='</table></div>';
+  $('#view').innerHTML=h;
+}
+function data(){
+  $('#view').innerHTML=`<div class="card"><h2>Export</h2><p class="mute">Copy this text and keep it somewhere safe, like a notes app or an email to yourself.</p><textarea id="ex" readonly rows="6" style="width:100%">${esc(JSON.stringify(S))}</textarea><div class="row" style="margin-top:8px"><button class="btn" onclick="copyEx()">Copy data</button><button class="btn" onclick="dlEx()">Download file</button><span class="mute" id="cm"></span></div></div><div class="card"><h2>Import</h2><p class="mute">Paste exported data below, or choose a saved .json or .txt file. Importing replaces the data on this device.</p><textarea id="im" rows="5" style="width:100%"></textarea><div class="row" style="margin-top:8px"><button class="btn" onclick="doImport($('#im').value)">Import data</button><input type="file" accept=".json,.txt,application/json,text/plain" onchange="fileImp(this)"></div><p class="mute" id="imm"></p></div><div class="card" id="er"><button class="btn ghost" onclick="eraseAsk()">Erase all data</button></div>`;
+}
+let Q={from:today(),to:today(),day:{}},QD={held:{},att:{},H:0,A:0},QMSG='';
+function qSet(k,v){Q[k]=v;quick()}
+function qWeek(m){const t=new Date(),f=new Date(t);if(m==='week')f.setDate(t.getDate()-((t.getDay()+6)%7));else f.setDate(t.getDate()-6);Q.from=ymd(f);Q.to=ymd(t);Q.day={};quick()}
+function qd(iso){return Q.day[iso]||(Q.day[iso]={hol:false,miss:{}})}
+function qHol(iso){const d=qd(iso);d.hol=!d.hol;quick()}
+function qAll(iso,n){const d=qd(iso);let all=true;for(let j=0;j<n;j++)if(!d.miss[j])all=false;d.miss={};if(!all)for(let j=0;j<n;j++)d.miss[j]=true;quick()}
+function qPer(iso,j,ok){qd(iso).miss[j]=!ok;quick()}
+function qApply(){
+  if(!QD.H)return;
+  const delta={};
+  S.subjects.forEach(s=>{const dh=QD.held[s.id]||0,da=QD.att[s.id]||0;delta[s.id]=[dh,da];s.t+=dh;s.a+=da});
+  S.undo={delta,from:Q.from,to:Q.to,prevUpto:S.upto||''};S.upto=(S.upto&&S.upto>Q.to)?S.upto:Q.to;S.at=Date.now();
+  if(!Array.isArray(S.applied))S.applied=[];
+  S.applied.push({from:Q.from,to:Q.to});
+  save();QMSG='Added '+QD.H+' classes ('+QD.A+' attended) for '+fmtD(Q.from)+' to '+fmtD(Q.to)+'.';Q.day={};quick();
+}
+function qUndo(){
+  if(!S.undo)return;
+  S.subjects.forEach(s=>{const x=S.undo.delta[s.id];if(x){s.t=Math.max(0,s.t-x[0]);s.a=Math.max(0,s.a-x[1]);if(s.a>s.t)s.a=s.t}});
+  if(Array.isArray(S.applied))S.applied.pop();
+  S.upto=S.undo.prevUpto||'';S.at=Date.now();S.undo=null;save();QMSG='Last update undone.';quick();
+}
+function quick(){
+  if(!S.subjects.length){$('#view').innerHTML='<div class="card empty">Add subjects and a timetable first, then use this tab to update attendance quickly.</div>';return}
+  const days=Math.round((new Date(Q.to+'T00:00:00')-new Date(Q.from+'T00:00:00'))/864e5)+1;
+  const bad=!(days>=1&&days<=7);
+  const ghost='class="btn ghost" style="color:var(--ink)"';
+  let h=QMSG?`<div class="card"><strong>${esc(QMSG)}</strong></div>`:'';QMSG='';
+  h+=statusCard(true);
+  if(S.undo)h+=`<div class="card row sp"><span class="mute">Last update: ${fmtD(S.undo.from)} to ${fmtD(S.undo.to)}</span><button ${ghost} onclick="qUndo()">Undo last update</button></div>`;
+  h+=`<div class="card"><h2>Update attendance for a short period</h2><p class="mute">Pick up to 7 days. Mark holidays and untick the classes you missed. Everything else counts as attended, and the totals are added to your current attendance.</p><div class="row"><label class="mute">From <input type="date" value="${Q.from}" onchange="qSet('from',this.value)"></label><label class="mute">To <input type="date" value="${Q.to}" onchange="qSet('to',this.value)"></label></div><div class="row" style="margin-top:8px"><button ${ghost} onclick="qWeek('week')">This week so far</button><button ${ghost} onclick="qWeek('7')">Last 7 days</button></div>${bad?'<p style="color:var(--bad);margin:10px 0 0">Choose a range of 1 to 7 days.</p>':''}</div>`;
+  if(bad){$('#view').innerHTML=h;return}
+  const ov=(S.applied||[]).find(r=>!(Q.to<r.from||Q.from>r.to));
+  if(ov)h+=`<div class="card" style="border-color:var(--warn)"><span class="tag warn">Check dates</span> <span class="mute">These dates overlap a period you already added (${fmtD(ov.from)} to ${fmtD(ov.to)}). Adding them again counts those classes twice.</span></div>`;
+  const held={},att={};S.subjects.forEach(s=>{held[s.id]=0;att[s.id]=0});
+  for(let i=0,d=new Date(Q.from+'T00:00:00');i<days;i++,d.setDate(d.getDate()+1)){
+    const iso=ymd(d),nm=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()],list=S.tt[nm];
+    if(!list||!list.length){h+=`<div class="card"><div class="row sp"><strong>${fmtD(iso)}</strong><span class="mute">No classes in timetable</span></div></div>`;continue}
+    const st=Q.day[iso]||{hol:false,miss:{}};let body='';
+    list.forEach((id,j)=>{const s=S.subjects.find(x=>x.id===id);if(!s)return;const ok=!st.miss[j];
+      if(!st.hol){held[id]++;if(ok)att[id]++}
+      body+=`<label class="chip"><input type="checkbox" ${ok?'checked':''} ${st.hol?'disabled':''} onchange="qPer('${iso}',${j},this.checked)">P${j+1} ${esc(s.name)}</label>`});
+    h+=`<div class="card"><div class="row sp"><strong>${fmtD(iso)}</strong><span class="row"><button ${ghost} onclick="qHol('${iso}')">${st.hol?'Undo holiday':'Holiday'}</button>${st.hol?'':`<button ${ghost} onclick="qAll('${iso}',${list.length})">Absent all day</button>`}</span></div>${st.hol?'<div class="mute" style="padding-top:8px">Holiday: no classes counted</div>':`<p class="mute" style="margin:8px 0 6px">Untick the classes you missed</p><div class="row">${body}</div>`}</div>`;
+  }
+  const H=Object.values(held).reduce((x,y)=>x+y,0),A=Object.values(att).reduce((x,y)=>x+y,0);
+  QD={held,att,H,A};
+  const[a,t]=sums(S.subjects),np=pct(a+A,t+H);
+  h+=`<div class="card"><div class="row sp"><div><div class="big">${fmt(np)}</div><div class="mute">Overall after this update (now ${fmt(pct(a,t))})</div></div><span class="tag ${cls(np)}">${np>=S.target?'Safe':'Below target'}</span></div><div class="mute" style="margin-top:6px">Adding ${H} classes held, ${A} attended, ${H-A} missed</div></div><div class="card scroll"><table><tr><th>Subject</th><th>Now</th><th>Held</th><th>Attended</th><th>After</th></tr>`;
+  S.subjects.forEach(s=>{const p2=pct(s.a+att[s.id],s.t+held[s.id]);h+=`<tr><td>${esc(s.name)}</td><td>${s.a}/${s.t}</td><td>+${held[s.id]}</td><td>+${att[s.id]}</td><td><span class="tag ${cls(p2)}">${s.a+att[s.id]}/${s.t+held[s.id]} · ${fmt(p2)}</span></td></tr>`});
+  h+=`</table></div><button class="btn" style="width:100%;padding:14px" ${H?'':'disabled'} onclick="qApply()">Add to my attendance</button>`;
+  if(!H)h+='<p class="mute">No classes fall in this range. Check the dates and your timetable.</p>';
+  $('#view').innerHTML=h;
+}
+function qCatch(){
+  const f=new Date(S.upto+'T00:00:00');f.setDate(f.getDate()+1);
+  const t=new Date(f);t.setDate(t.getDate()+6);const td=new Date(today()+'T00:00:00');
+  Q.from=ymd(f);Q.to=ymd(t>td?td:t);Q.day={};tab='quick';render();
+}
+function qUndoD(){tab='quick';render();qUndo()}
+function statusCard(q){
+  if(!S.subjects.length)return '';
+  const ghost='class="btn ghost" style="color:var(--ink)"';
+  let line,tag='',btn='';
+  if(S.upto){
+    const gap=Math.round((new Date(today()+'T00:00:00')-new Date(S.upto+'T00:00:00'))/864e5);
+    line=`Attendance counted up to <strong>${fmtD(S.upto)}</strong>`;
+    if(gap>0){tag=`<span class="tag warn">${gap} day${gap>1?'s':''} not added yet</span>`;if(!q)btn=`<button class="btn" onclick="qCatch()">${gap>7?'Update next 7 days':'Update now'}</button>`}
+    else tag='<span class="tag ok">Up to date</span>';
+  }else line='Set the date your attendance is counted up to in the Subjects tab, or use Quick update.';
+  const at=S.at?new Date(S.at).toLocaleString(undefined,{weekday:'short',day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}):'';
+  let sub=at?`Last updated ${at}`:'';
+  if(S.undo)sub+=`${sub?' \u00b7 ':''}Last quick update covered ${fmtD(S.undo.from)} to ${fmtD(S.undo.to)}`;
+  if(S.undo&&!q)btn+=`<button ${ghost} onclick="qUndoD()">Undo last quick update</button>`;
+  return `<div class="card"><div class="row sp"><div>${line}</div>${tag}</div>${sub?`<div class="mute">${sub}</div>`:''}${btn?`<div class="row" style="margin-top:10px">${btn}</div>`:''}</div>`;
+}
+function eraseAsk(){$('#er').innerHTML='<p class="mute">This deletes your name, subjects, timetable, attendance and plan from this device. Export first if you want a backup.</p><div class="row"><button class="btn" style="background:var(--bad)" onclick="eraseDo()">Yes, erase everything</button><button class="btn ghost" style="color:var(--ink)" onclick="data()">Cancel</button></div>'}
+function eraseDo(){S={name:'',target:75,subjects:[],tt:{}};DAYS.forEach(d=>S.tt[d]=[]);save();tab='dash';render()}
+async function dlEx(){const m=$('#cm');try{const d=window.claude&&await window.claude.use('downloads');if(!d){m.textContent='Download is not available here. Use Copy data instead.';return}await d.save({filename:'attendance-backup-'+today()+'.json',data:JSON.stringify(S,null,2)});m.textContent='Saved'}catch(e){m.textContent=(e&&e.code==='declined')?'Download cancelled':'Download failed. Use Copy data instead.'}}
+const fmtD=v=>new Date(v+'T00:00:00').toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short'});
+function chips(k){return S.plan[k].map(v=>`<span class="chip" role="button" tabindex="0" title="Remove" onclick="planDel('${k}','${v}')">${fmtD(v)} ✕</span>`).join('')||'<span class="mute">None added</span>'}
+function planDel(k,v){S.plan[k]=S.plan[k].filter(x=>x!==v);save();plan()}
+function planAddRange(k){
+  const f=$('#'+k+'f').value,t=$('#'+k+'t').value||f;if(!f||t<f)return;
+  let n=0;for(let d=new Date(f+'T00:00:00');ymd(d)<=t&&n<400;d.setDate(d.getDate()+1)){n++;const v=ymd(d);if(!S.plan[k].includes(v))S.plan[k].push(v)}
+  S.plan[k].sort();save();plan();
+}
+function plan(){
+  if(!S.subjects.length){$('#view').innerHTML='<div class="card empty">Add subjects and a timetable to plan ahead.</div>';return}
+  if(!S.plan||!Array.isArray(S.plan.hol))S.plan={from:today(),to:today(),hol:[],abs:[],absDays:{}};
+  const F=S.plan;if(!F.absDays)F.absDays={};
+  const rng=(k,title,help)=>`<div class="card"><h2>${title}</h2><p class="mute">${help}</p><div class="row"><input type="date" id="${k}f" aria-label="From date"><span class="mute">to</span><input type="date" id="${k}t" aria-label="To date"><button class="btn" onclick="planAddRange('${k}')">Add</button></div><div class="row" style="margin-top:10px">${chips(k)}</div></div>`;
+  let h=`<div class="card"><h2>Period when classes will be held</h2><div class="row"><label class="mute">From <input type="date" value="${F.from}" onchange="S.plan.from=this.value;save();plan()"></label><label class="mute">To <input type="date" value="${F.to}" onchange="S.plan.to=this.value;save();plan()"></label></div></div>`;
+  h+=rng('hol','Holidays (no classes)','Pick one date, or a from and to range. Tap a date below to remove it.');
+  h+=rng('abs','Days I will be absent','Pick one date, or a from and to range. Tap a date below to remove it.');
+  h+=`<div class="card"><h2>Always absent on</h2><p class="mute">Every one of these weekdays in the period counts as absent.</p><div class="row">${DAYS.map(d=>`<label class="chip"><input type="checkbox" ${F.absDays[d]?'checked':''} onchange="S.plan.absDays['${d}']=this.checked?1:0;save();plan()">${d}</label>`).join('')}</div></div>`;
+  const held={},att={};S.subjects.forEach(s=>{held[s.id]=0;att[s.id]=0});
+  let hit=0,n=0;
+  for(let d=new Date(F.from+'T00:00:00');d<=new Date(F.to+'T00:00:00')&&n<400;d.setDate(d.getDate()+1)){
+    n++;const iso=ymd(d),nm=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()],list=S.tt[nm];
+    if(!list||!list.length)continue;
+    if(F.hol.includes(iso)){hit++;continue}
+    const away=F.abs.includes(iso)||F.absDays[nm];
+    list.forEach(id=>{if(id in held){held[id]++;if(!away)att[id]++}});
+  }
+  const H=Object.values(held).reduce((x,y)=>x+y,0),A=Object.values(att).reduce((x,y)=>x+y,0);
+  const[a,t]=sums(S.subjects),a2=a+A,t2=t+H,np=pct(a2,t2);
+  h+=`<div class="card"><div class="row sp"><div><div class="big">${fmt(np)}</div><div class="mute">Projected overall at the end of the period (now ${fmt(pct(a,t))})</div></div><span class="tag ${cls(np)}">${np>=S.target?'Safe':'Below target'}</span></div><div class="bar ${cls(np)}"><i style="width:${Math.min(np,100)}%"></i><b style="left:${S.target}%"></b></div><div class="mute">${H} classes scheduled · attend ${A} · miss ${H-A} · ${hit} holiday${hit===1?'':'s'} with classes skipped</div><div class="mute">${a2} of ${t2} classes attended · ${advice(a2,t2)}</div></div><div class="card scroll"><table><tr><th>Subject</th><th>Now</th><th>Held</th><th>Attend</th><th>Projected</th></tr>`;
+  S.subjects.forEach(s=>{const p2=pct(s.a+att[s.id],s.t+held[s.id]);h+=`<tr><td>${esc(s.name)}</td><td>${fmt(pct(s.a,s.t))}</td><td>${held[s.id]}</td><td>${att[s.id]}</td><td><span class="tag ${cls(p2)}">${fmt(p2)}</span></td></tr>`});
+  h+='</table></div>';
+  if(H===0)h+='<p class="mute">No classes fall in this period. Check the dates and that your timetable is filled in.</p>';
+  $('#view').innerHTML=h;
+}
+function copyEx(){const el=$('#ex');const ok=()=>$('#cm').textContent='Copied';const fb=()=>{el.select();try{document.execCommand('copy');ok()}catch(e){$('#cm').textContent='Select the text and copy it manually'}};try{navigator.clipboard.writeText(el.value).then(ok,fb)}catch(e){fb()}}
+function fileImp(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=()=>doImport(String(r.result));r.readAsText(f)}
+function doImport(txt){
+  const m=$('#imm');
+  try{
+    const o=JSON.parse(txt);
+    if(!o||!Array.isArray(o.subjects))throw 0;
+    const n={target:Math.min(100,Math.max(1,+o.target||75)),subjects:o.subjects.map((s,i)=>({id:s.id||Date.now()+i,name:String(s.name||'Subject'),a:Math.max(0,Math.floor(+s.a||0)),t:Math.max(0,Math.floor(+s.t||0))})),tt:{}};
+    DAYS.forEach(d=>n.tt[d]=Array.isArray(o.tt&&o.tt[d])?o.tt[d]:[]);
+    n.name=String(o.name||'').slice(0,40);n.applied=Array.isArray(o.applied)?o.applied.slice(-50):[];n.undo=null;n.upto=String(o.upto||'').length===10?o.upto:'';n.at=+o.at||0;n.plan=(o.plan&&Array.isArray(o.plan.hol))?o.plan:null;S=n;save();tab='dash';render();
+  }catch(e){m.textContent='That data could not be read. Paste the full text you copied from Export.'}
+}
+let P={from:today(),to:today(),days:{Mon:1,Tue:1,Wed:1,Thu:1,Fri:1,Sat:1},hol:'',mode:'days',pd:'Mon',sel:{},weeks:1};
+function pred(){if(P.mode==='per'){predPer();return}predDays()}
+function predDays(){
+  if(!S.subjects.length){$('#view').innerHTML='<div class="card empty">Add subjects and a timetable to predict future attendance.</div>';return}
+  let h=modeBar()+`<div class="card"><h2>If I miss whole days</h2>
+  <div class="row"><label class="mute">From <input type="date" value="${P.from}" onchange="P.from=this.value;pred()"></label><label class="mute">To <input type="date" value="${P.to}" onchange="P.to=this.value;pred()"></label></div>
+  <p class="mute" style="margin-bottom:6px">Weekdays I will be absent</p><div class="row">${DAYS.map(d=>`<label class="chip"><input type="checkbox" ${P.days[d]?'checked':''} onchange="P.days['${d}']=this.checked?1:0;pred()">${d}</label>`).join('')}</div>
+  <p class="mute" style="margin-bottom:6px">Holidays in this range (no classes), comma-separated dates like 2026-10-20</p>
+  <input type="text" style="width:100%" value="${esc(P.hol)}" onchange="P.hol=this.value;pred()"></div>`;
+  const hol=P.hol.split(',').map(x=>x.trim()).filter(Boolean);
+  const miss={};S.subjects.forEach(s=>miss[s.id]=0);
+  let days=0;
+  for(let d=new Date(P.from+'T00:00:00');d<=new Date(P.to+'T00:00:00')&&days<400;d.setDate(d.getDate()+1)){
+    days++;const iso=ymd(d),name=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];
+    if(!P.days[name]||hol.includes(iso)||!S.tt[name])continue;
+    S.tt[name].forEach(id=>{if(id in miss)miss[id]++});
+  }
+  const total=Object.values(miss).reduce((x,y)=>x+y,0);
+  const[a,t]=sums(S.subjects),np=pct(a,t+total);
+  h+=`<div class="card"><div class="row sp"><div><div class="big">${fmt(np)}</div><div class="mute">Overall after missing ${total} class${total===1?'':'es'} (now ${fmt(pct(a,t))})</div></div><span class="tag ${cls(np)}">${np>=S.target?'Still safe':'Below target'}</span></div>
+  <div class="bar ${cls(np)}"><i style="width:${Math.min(np,100)}%"></i><b style="left:${S.target}%"></b></div></div>
+  <div class="card scroll"><table><tr><th>Subject</th><th>Now</th><th>Missed</th><th>After</th></tr>`;
+  S.subjects.forEach(s=>{const n=pct(s.a,s.t+miss[s.id]);h+=`<tr><td>${esc(s.name)}</td><td>${fmt(pct(s.a,s.t))}</td><td>${miss[s.id]}</td><td><span class="tag ${cls(n)}">${fmt(n)}</span></td></tr>`});
+  h+='</table></div>';
+  if(total===0)h+='<p class="mute">No classes fall in this selection. Check that your timetable is filled in for the chosen weekdays.</p>';
+  $('#view').innerHTML=h;
+}
+render();
+</script>
+</body>
+</html>
